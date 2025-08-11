@@ -1,4 +1,4 @@
-# Build the updated single-file HTML per the user's specs.
+# Update: add a Home page as the main hub with Recent Work + About snippet.
 html = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,34 +29,21 @@ html = r"""<!DOCTYPE html>
       --sans: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
     }
     * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--fg);
-      font-family: var(--sans);
-      line-height: 1.6;
-    }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); line-height: 1.6; }
     /* Blackboard vibe */
     body::before {
-      content: "";
-      position: fixed; inset: 0; pointer-events: none;
+      content: ""; position: fixed; inset: 0; pointer-events: none;
       background:
         radial-gradient(ellipse at top left, rgba(255,255,255,0.035), transparent 45%),
         radial-gradient(ellipse at bottom right, rgba(255,255,255,0.025), transparent 45%);
       mix-blend-mode: screen; opacity: .7;
     }
-
     a { color: var(--fg); }
     a:hover { text-decoration: underline; }
 
     .container { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
 
-    header {
-      position: sticky; top: 0; z-index: 10;
-      background: linear-gradient(to bottom, rgba(0,0,0,.95), rgba(0,0,0,.85));
-      border-bottom: 1px dashed var(--line);
-      backdrop-filter: blur(4px);
-    }
+    header { position: sticky; top: 0; z-index: 10; background: linear-gradient(to bottom, rgba(0,0,0,.95), rgba(0,0,0,.85)); border-bottom: 1px dashed var(--line); backdrop-filter: blur(4px); }
     .nav { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
     .logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
     .logo svg { display: block; }
@@ -71,18 +58,10 @@ html = r"""<!DOCTYPE html>
     .tab.active, .tab:hover { outline: 2px solid #fff; outline-offset: -2px; }
 
     .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .btn {
-      background: var(--chip); color: var(--fg);
-      border: 1px dashed var(--line); border-radius: 10px;
-      padding: 8px 12px; cursor: pointer; font-size: 14px;
-    }
+    .btn { background: var(--chip); color: var(--fg); border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; font-size: 14px; }
     .btn:hover { outline: 2px solid #fff; outline-offset: -2px; }
 
-    .input, .select, .textarea {
-      width: 100%; background: var(--bg2); color: var(--fg);
-      border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px;
-      font-size: 14px; outline: none;
-    }
+    .input, .select, .textarea { width: 100%; background: var(--bg2); color: var(--fg); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; font-size: 14px; outline: none; }
     .textarea { min-height: 180px; font-family: var(--mono); white-space: pre-wrap; }
     .field { margin-bottom: 12px; }
     .label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
@@ -108,30 +87,33 @@ html = r"""<!DOCTYPE html>
     main > section { display: none; padding: 18px 0 24px; }
     main > section.active { display: block; }
 
+    .grid { display: grid; gap: 10px; }
+    @media (min-width: 700px) { .grid.cols-3 { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 700px) { .grid.cols-2 { grid-template-columns: repeat(2, 1fr); } }
+
+    .chip {
+      display: inline-block; padding: 2px 8px; border: 1px dashed var(--line);
+      border-radius: 999px; background: var(--chip); font-size: 12px; color: var(--muted);
+    }
+
     @media (max-width: 640px) { .nav-links { width: 100%; margin: 8px 0 0; } }
   </style>
 </head>
 <body>
   <header>
     <div class="container nav">
-      <a href="#projects" class="logo" aria-label="Home">
+      <a href="#home" class="logo" aria-label="Home">
         <!-- Logo: two orbiting bodies with fading trails (top-down celestial plane) -->
         <svg width="44" height="44" viewBox="0 0 64 64" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <!-- barycenter -->
           <circle cx="32" cy="32" r="1.6" fill="white"/>
-          <!-- outer orbit ellipse -->
           <ellipse cx="32" cy="32" rx="26" ry="18" opacity="0.55"/>
-          <!-- inner orbit ellipse -->
           <ellipse cx="32" cy="32" rx="14" ry="10" opacity="0.55"/>
-          <!-- body A and its fading trail -->
           <g>
-            <!-- trail segments shrinking -->
             <path d="M 10 32 Q 14 16 32 14" opacity="0.20"/>
             <path d="M 12 32 Q 16 17 32 15" opacity="0.35"/>
             <path d="M 14 32 Q 18 18 32 16" opacity="0.55"/>
             <circle cx="34" cy="16" r="2.6" fill="white"/>
           </g>
-          <!-- body B and its fading trail -->
           <g>
             <path d="M 54 32 Q 48 46 32 50" opacity="0.20"/>
             <path d="M 52 32 Q 47 45 32 49" opacity="0.35"/>
@@ -146,6 +128,7 @@ html = r"""<!DOCTYPE html>
       </a>
 
       <nav class="nav-links">
+        <a class="tab" data-route="home" href="#home">Home</a>
         <a class="tab" data-route="projects" href="#projects">Projects</a>
         <a class="tab" data-route="blog" href="#blog">Blog</a>
         <a class="tab" data-route="essays" href="#essays">Essays</a>
@@ -159,6 +142,27 @@ html = r"""<!DOCTYPE html>
   </header>
 
   <main class="container">
+    <!-- HOME -->
+    <section id="page-home">
+      <div class="card" style="margin-bottom:14px;">
+        <div class="prose" id="home-hero"></div>
+      </div>
+
+      <div class="grid cols-3" id="home-recent"></div>
+
+      <div class="card" style="margin-top:14px;">
+        <div class="toolbar" style="justify-content: space-between;">
+          <strong>Quick links</strong>
+          <div>
+            <a class="btn" href="#projects">All Projects</a>
+            <a class="btn" href="#blog">All Posts</a>
+            <a class="btn" href="#essays">All Essays</a>
+            <a class="btn" href="#about">About</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Projects -->
     <section id="page-projects">
       <div class="card">
@@ -295,7 +299,7 @@ html = r"""<!DOCTYPE html>
   <footer>
     <div class="container inner">
       <div id="footer-copy">© <span id="year"></span> dylan standen blog</div>
-      <div><a href="#projects">Projects</a> · <a href="#blog">Blog</a> · <a href="#essays">Essays</a> · <a href="#about">About</a></div>
+      <div><a href="#home">Home</a> · <a href="#projects">Projects</a> · <a href="#blog">Blog</a> · <a href="#essays">Essays</a> · <a href="#about">About</a></div>
     </div>
   </footer>
 
@@ -327,6 +331,12 @@ html = r"""<!DOCTYPE html>
       }
       return div;
     };
+    const stripToText = (htmlEl) => htmlEl.textContent || htmlEl.innerText || "";
+    const excerpt = (markdown, n=160) => {
+      const frag = md(markdown || "");
+      const text = stripToText(frag).replace(/\\s+/g,' ').trim();
+      return text.length > n ? text.slice(0, n-1) + '…' : text;
+    };
     const insertAtCursor = (textarea, text) => {
       const start = textarea.selectionStart || 0;
       const end = textarea.selectionEnd || 0;
@@ -342,10 +352,10 @@ html = r"""<!DOCTYPE html>
 
     // ---------- Keys & Demo ----------
     const K = {
-      PROFILE: 'bb_profile_v2',
-      PROJ: 'bb_projects_v2',
-      BLOG: 'bb_blog_v2',
-      ESSAYS: 'bb_essays_v2',
+      PROFILE: 'bb_profile_v3',
+      PROJ: 'bb_projects_v3',
+      BLOG: 'bb_blog_v3',
+      ESSAYS: 'bb_essays_v3',
     };
 
     const demoProfile = {
@@ -361,7 +371,7 @@ html = r"""<!DOCTYPE html>
         tags: ['physics','simulation'],
         url: 'https://example.com',
         pdf: '',
-        body: 'A quick note on two-body motion and conserved quantities. Energy: $$E=\\frac{1}{2}\\mu v^2 - \\frac{G M \\mu}{r}$$',
+        body: 'Two-body motion and conserved quantities. Energy: $$E=\\frac{1}{2}\\mu v^2 - \\frac{G M \\mu}{r}$$',
         createdAt: Date.now()-1000*60*60*24*10, updatedAt: Date.now()-1000*60*60*24*3
       }
     ];
@@ -378,7 +388,7 @@ html = r"""<!DOCTYPE html>
     if (!storage.get(K.ESSAYS)) storage.set(K.ESSAYS, demoEssays);
 
     // ---------- Router ----------
-    const routes = ['projects','blog','essays','about'];
+    const routes = ['home','projects','blog','essays','about'];
     const show = (name) => {
       routes.forEach(r => {
         const section = $('#page-' + r);
@@ -387,11 +397,15 @@ html = r"""<!DOCTYPE html>
         section.classList.toggle('active', r === name);
         tab.classList.toggle('active', r === name);
       });
+      // update document title
+      const p = storage.get(K.PROFILE, demoProfile);
+      document.title = `${p.title || 'dylan standen blog'} — ${name}`;
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (name === 'home') renderHome();
     };
     const currentRoute = () => {
       const h = (location.hash || '').replace('#','').toLowerCase();
-      return routes.includes(h) ? h : 'projects';
+      return routes.includes(h) ? h : 'home';
     };
     window.addEventListener('hashchange', () => show(currentRoute()));
 
@@ -445,6 +459,7 @@ html = r"""<!DOCTYPE html>
           const arr = storage.get(K.PROJ, []).filter(x => x.id !== it.id);
           storage.set(K.PROJ, arr);
           renderProjects();
+          renderHome();
         };
       }
     }
@@ -471,7 +486,7 @@ html = r"""<!DOCTYPE html>
         wrap.append(head, body); listEl.append(wrap);
         eBtn.onclick = () => { $('#blog-title').value = it.title; $('#blog-body').value = it.body||''; editing.blog = it.id; show('blog'); };
         dBtn.onclick = () => { if (!confirm('Delete this post?')) return;
-          const arr = storage.get(K.BLOG, []).filter(x => x.id !== it.id); storage.set(K.BLOG, arr); renderBlog(); };
+          const arr = storage.get(K.BLOG, []).filter(x => x.id !== it.id); storage.set(K.BLOG, arr); renderBlog(); renderHome(); };
       }
     }
 
@@ -497,7 +512,7 @@ html = r"""<!DOCTYPE html>
         wrap.append(head, body); listEl.append(wrap);
         eBtn.onclick = () => { $('#essay-title').value = it.title; $('#essay-body').value = it.body||''; editing.essays = it.id; show('essays'); };
         dBtn.onclick = () => { if (!confirm('Delete this essay?')) return;
-          const arr = storage.get(K.ESSAYS, []).filter(x => x.id !== it.id); storage.set(K.ESSAYS, arr); renderEssays(); };
+          const arr = storage.get(K.ESSAYS, []).filter(x => x.id !== it.id); storage.set(K.ESSAYS, arr); renderEssays(); renderHome(); };
       }
     }
 
@@ -517,6 +532,47 @@ html = r"""<!DOCTYPE html>
         (p.links||[]).map(l => `- [${l.label}](${l.url})`).join('\\n')
       }`);
       prev.append(frag);
+      renderHome(); // update hero/about snippet if changed
+    }
+
+    function renderHome() {
+      // Hero with title, tagline, short about snippet
+      const p = storage.get(K.PROFILE, demoProfile);
+      const bioFrag = md(p.bio || '');
+      const bioText = stripToText(bioFrag).replace(/\\s+/g,' ').trim();
+      const short = bioText ? (bioText.length > 220 ? bioText.slice(0, 220) + '…' : bioText) : 'Welcome.';
+      const hero = md(`# ${p.title || 'dylan standen blog'}\n\n_${p.tagline || ''}_\n\n${short}\n\n[Read more →](#about)`);
+      const heroWrap = $('#home-hero'); heroWrap.innerHTML = ''; heroWrap.append(hero);
+
+      // Recent work: unify across projects/blog/essays
+      const proj = (storage.get(K.PROJ, []) || []).map(it => ({ type:'Project', updatedAt: it.updatedAt || it.createdAt || 0, title: it.title, body: it.body||'', goto:'#projects' }));
+      const blog = (storage.get(K.BLOG, []) || []).map(it => ({ type:'Post',    updatedAt: it.updatedAt || it.createdAt || 0, title: it.title, body: it.body||'', goto:'#blog' }));
+      const essays = (storage.get(K.ESSAYS, []) || []).map(it => ({ type:'Essay',   updatedAt: it.updatedAt || it.createdAt || 0, title: it.title, body: it.body||'', goto:'#essays' }));
+      const all = [...proj, ...blog, ...essays].sort((a,b) => b.updatedAt - a.updatedAt).slice(0, 6);
+      const grid = $('#home-recent'); grid.innerHTML = '';
+
+      if (all.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'card'; empty.textContent = 'No work yet—add your first project, post, or essay!';
+        grid.append(empty);
+        return;
+      }
+
+      for (const it of all) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const head = document.createElement('div');
+        head.className = 'item-head';
+        const left = document.createElement('div');
+        const title = document.createElement('div'); title.className='item-title'; title.textContent = it.title;
+        const meta = document.createElement('div'); meta.className='item-meta'; meta.textContent = `${it.type} • ${fmtDate(it.updatedAt)}`;
+        left.append(title, meta);
+        const btn = document.createElement('a'); btn.className='btn'; btn.textContent='Open'; btn.href = it.goto;
+        head.append(left, btn);
+        const body = document.createElement('div'); body.className='hint'; body.textContent = excerpt(it.body, 180);
+        card.append(head, body);
+        grid.append(card);
+      }
     }
 
     // ---------- Editors ----------
@@ -555,7 +611,7 @@ html = r"""<!DOCTYPE html>
       storage.set(K.PROJ, items);
       editing.proj = null;
       $('#proj-title').value = ''; $('#proj-tags').value = ''; $('#proj-url').value=''; $('#proj-pdf').value=''; $('#proj-body').value = '';
-      renderProjects();
+      renderProjects(); renderHome();
     };
     $('#proj-cancel').onclick = () => { editing.proj = null; $('#proj-title').value=''; $('#proj-tags').value=''; $('#proj-url').value=''; $('#proj-pdf').value=''; $('#proj-body').value=''; };
 
@@ -574,7 +630,7 @@ html = r"""<!DOCTYPE html>
       storage.set(K.BLOG, items);
       editing.blog = null;
       $('#blog-title').value=''; $('#blog-body').value='';
-      renderBlog();
+      renderBlog(); renderHome();
     };
     $('#blog-cancel').onclick = () => { editing.blog = null; $('#blog-title').value=''; $('#blog-body').value=''; };
 
@@ -593,7 +649,7 @@ html = r"""<!DOCTYPE html>
       storage.set(K.ESSAYS, items);
       editing.essays = null;
       $('#essay-title').value=''; $('#essay-body').value='';
-      renderEssays();
+      renderEssays(); renderHome();
     };
     $('#essay-cancel').onclick = () => { editing.essays = null; $('#essay-title').value=''; $('#essay-body').value=''; };
 
@@ -655,14 +711,13 @@ html = r"""<!DOCTYPE html>
       const y = new Date().getFullYear();
       $('#year').textContent = y;
       show(currentRoute());
-      document.title = (storage.get(K.PROFILE, demoProfile).title || 'dylan standen blog') + ' — blackboard';
     }
     renderAll();
   </script>
 </body>
 </html>
 """
-with open('/mnt/data/dylan_standen_blog.html', 'w', encoding='utf-8') as f:
+with open('/mnt/data/dylan_standen_blog_home.html', 'w', encoding='utf-8') as f:
     f.write(html)
 len(html)
 
