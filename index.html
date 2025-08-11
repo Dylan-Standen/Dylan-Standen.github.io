@@ -1,13 +1,12 @@
-# Create a fully working single-file HTML website with blackboard style, Markdown+KaTeX support,
-# and sections for Experiments, Blog, Essays, and About. Includes export/import and image insertion.
+# Build the updated single-file HTML per the user's specs.
 html = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Neuro Notes — Blackboard</title>
+  <title>dylan standen blog — blackboard</title>
 
-  <!-- KaTeX (for LaTeX math rendering) -->
+  <!-- KaTeX (LaTeX math) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex/dist/contrib/auto-render.min.js"></script>
@@ -37,17 +36,14 @@ html = r"""<!DOCTYPE html>
       font-family: var(--sans);
       line-height: 1.6;
     }
-    /* Blackboard texture hint (subtle noise) */
+    /* Blackboard vibe */
     body::before {
       content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
+      position: fixed; inset: 0; pointer-events: none;
       background:
         radial-gradient(ellipse at top left, rgba(255,255,255,0.035), transparent 45%),
         radial-gradient(ellipse at bottom right, rgba(255,255,255,0.025), transparent 45%);
-      mix-blend-mode: screen;
-      opacity: .7;
+      mix-blend-mode: screen; opacity: .7;
     }
 
     a { color: var(--fg); }
@@ -61,60 +57,37 @@ html = r"""<!DOCTYPE html>
       border-bottom: 1px dashed var(--line);
       backdrop-filter: blur(4px);
     }
-    .nav {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 0;
-    }
-    .logo {
-      display: inline-flex; align-items: center; gap: 10px;
-      text-decoration: none;
-    }
+    .nav { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+    .logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
     .logo svg { display: block; }
-    .logo-title { font-weight: 700; letter-spacing: .3px; }
+    .logo-title { font-weight: 700; letter-spacing: .3px; text-transform: lowercase; }
     .logo-sub { font-size: 12px; color: var(--muted); line-height: 1; margin-top: -4px; }
 
-    .nav-links { margin-left: auto; display: flex; gap: 6px; }
+    .nav-links { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
     .tab {
       padding: 8px 12px; border: 1px dashed var(--line); border-radius: 10px;
       background: var(--chip); color: var(--fg); text-decoration: none; font-size: 14px;
     }
     .tab.active, .tab:hover { outline: 2px solid #fff; outline-offset: -2px; }
 
-    .toolbar {
-      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-    }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .btn {
-      background: var(--chip);
-      color: var(--fg);
-      border: 1px dashed var(--line);
-      border-radius: 10px;
-      padding: 8px 12px;
-      cursor: pointer;
-      font-size: 14px;
+      background: var(--chip); color: var(--fg);
+      border: 1px dashed var(--line); border-radius: 10px;
+      padding: 8px 12px; cursor: pointer; font-size: 14px;
     }
     .btn:hover { outline: 2px solid #fff; outline-offset: -2px; }
 
     .input, .select, .textarea {
-      width: 100%;
-      background: var(--bg2);
-      color: var(--fg);
-      border: 1px dashed var(--line);
-      border-radius: 10px;
-      padding: 10px 12px;
-      font-size: 14px;
-      outline: none;
+      width: 100%; background: var(--bg2); color: var(--fg);
+      border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px;
+      font-size: 14px; outline: none;
     }
     .textarea { min-height: 180px; font-family: var(--mono); white-space: pre-wrap; }
     .field { margin-bottom: 12px; }
     .label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
 
-    .card {
-      background: var(--card);
-      border: 1px dashed var(--line);
-      border-radius: 14px;
-      padding: 16px;
-    }
-
+    .card { background: var(--card); border: 1px dashed var(--line); border-radius: 14px; padding: 16px; }
     .list { display: grid; gap: 10px; }
     .item { padding: 14px; border-radius: 12px; border: 1px dashed var(--line); background: #0d0d0d; }
     .item-head { display: flex; align-items: baseline; gap: 8px; justify-content: space-between; }
@@ -132,35 +105,48 @@ html = r"""<!DOCTYPE html>
     footer { border-top: 1px dashed var(--line); margin-top: 40px; color: var(--muted); }
     footer .inner { padding: 16px 0; display: flex; justify-content: space-between; align-items: center; }
 
-    /* Hide all sections by default; show via [data-page] attribute */
     main > section { display: none; padding: 18px 0 24px; }
     main > section.active { display: block; }
 
-    /* Small screens */
-    @media (max-width: 640px) {
-      .nav-links { width: 100%; margin: 8px 0 0; }
-    }
+    @media (max-width: 640px) { .nav-links { width: 100%; margin: 8px 0 0; } }
   </style>
 </head>
 <body>
   <header>
     <div class="container nav">
-      <a href="#experiments" class="logo">
-        <!-- Physics-y logo: an "atom" drawn like chalk -->
-        <svg width="42" height="42" viewBox="0 0 64 64" fill="none" stroke="white" stroke-width="2">
-          <circle cx="32" cy="32" r="3" fill="white"></circle>
-          <ellipse cx="32" cy="32" rx="22" ry="10" transform="rotate(20 32 32)" />
-          <ellipse cx="32" cy="32" rx="22" ry="10" transform="rotate(-20 32 32)" />
-          <ellipse cx="32" cy="32" rx="22" ry="10" transform="rotate(90 32 32)" />
+      <a href="#projects" class="logo" aria-label="Home">
+        <!-- Logo: two orbiting bodies with fading trails (top-down celestial plane) -->
+        <svg width="44" height="44" viewBox="0 0 64 64" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <!-- barycenter -->
+          <circle cx="32" cy="32" r="1.6" fill="white"/>
+          <!-- outer orbit ellipse -->
+          <ellipse cx="32" cy="32" rx="26" ry="18" opacity="0.55"/>
+          <!-- inner orbit ellipse -->
+          <ellipse cx="32" cy="32" rx="14" ry="10" opacity="0.55"/>
+          <!-- body A and its fading trail -->
+          <g>
+            <!-- trail segments shrinking -->
+            <path d="M 10 32 Q 14 16 32 14" opacity="0.20"/>
+            <path d="M 12 32 Q 16 17 32 15" opacity="0.35"/>
+            <path d="M 14 32 Q 18 18 32 16" opacity="0.55"/>
+            <circle cx="34" cy="16" r="2.6" fill="white"/>
+          </g>
+          <!-- body B and its fading trail -->
+          <g>
+            <path d="M 54 32 Q 48 46 32 50" opacity="0.20"/>
+            <path d="M 52 32 Q 47 45 32 49" opacity="0.35"/>
+            <path d="M 50 32 Q 46 44 32 48" opacity="0.55"/>
+            <circle cx="30" cy="48" r="1.8" fill="white"/>
+          </g>
         </svg>
         <div>
-          <div class="logo-title" id="siteTitle">Neuro Notes</div>
-          <div class="logo-sub" id="siteTagline">Experiments • Essays • Blog</div>
+          <div class="logo-title" id="siteTitle">dylan standen blog</div>
+          <div class="logo-sub" id="siteTagline">projects • essays • blog</div>
         </div>
       </a>
 
       <nav class="nav-links">
-        <a class="tab" data-route="experiments" href="#experiments">Experiments</a>
+        <a class="tab" data-route="projects" href="#projects">Projects</a>
         <a class="tab" data-route="blog" href="#blog">Blog</a>
         <a class="tab" data-route="essays" href="#essays">Essays</a>
         <a class="tab" data-route="about" href="#about">About</a>
@@ -173,46 +159,46 @@ html = r"""<!DOCTYPE html>
   </header>
 
   <main class="container">
-    <!-- Experiments -->
-    <section id="page-experiments">
+    <!-- Projects -->
+    <section id="page-projects">
       <div class="card">
         <div class="toolbar" style="justify-content: space-between; margin-bottom: 12px;">
-          <div style="font-weight:600;">Add / Edit Experiment</div>
-          <div class="hint">Use Markdown + LaTeX ($...$, $$...$$). Click “Insert Image” to embed a local image.</div>
+          <div style="font-weight:600;">Add / Edit Project</div>
+          <div class="hint">Use Markdown + LaTeX ($...$, $$...$$). “Insert Image” embeds local images as data URLs.</div>
         </div>
 
         <div class="field">
           <label class="label">Title</label>
-          <input id="exp-title" class="input" placeholder="e.g., Alpha band oscillations under working memory load" />
-        </div>
-        <div class="field">
-          <label class="label">Status</label>
-          <select id="exp-status" class="select">
-            <option>Planning</option>
-            <option>Running</option>
-            <option>Completed</option>
-          </select>
+          <input id="proj-title" class="input" placeholder="e.g., Visualizing coupled oscillators" />
         </div>
         <div class="field">
           <label class="label">Tags (comma separated)</label>
-          <input id="exp-tags" class="input" placeholder="EEG, working memory, alpha" />
+          <input id="proj-tags" class="input" placeholder="physics, simulation, viz" />
+        </div>
+        <div class="field">
+          <label class="label">Project URL (optional)</label>
+          <input id="proj-url" class="input" placeholder="https://github.com/username/repo or live demo" />
+        </div>
+        <div class="field">
+          <label class="label">PDF URL (optional)</label>
+          <input id="proj-pdf" class="input" placeholder="https://.../paper.pdf" />
         </div>
         <div class="field">
           <label class="label">Body (Markdown + LaTeX)</label>
-          <textarea id="exp-body" class="textarea" placeholder="Methods, stimuli, analysis plan... Use $$\\LaTeX$$ for equations."></textarea>
+          <textarea id="proj-body" class="textarea" placeholder="Short description, methods, screenshots..."></textarea>
           <div class="toolbar" style="margin-top:8px;">
-            <button class="btn" data-insert-image="exp-body">Insert Image</button>
-            <button class="btn" id="exp-save">Save</button>
-            <button class="btn" id="exp-cancel">Cancel</button>
+            <button class="btn" data-insert-image="proj-body">Insert Image</button>
+            <button class="btn" id="proj-save">Save</button>
+            <button class="btn" id="proj-cancel">Cancel</button>
           </div>
         </div>
       </div>
 
-      <h3 style="margin: 18px 0 8px;">Your Experiments</h3>
+      <h3 style="margin: 18px 0 8px;">Your Projects</h3>
       <div class="field">
-        <input id="exp-search" class="input" placeholder="Search experiments..." />
+        <input id="proj-search" class="input" placeholder="Search projects..." />
       </div>
-      <div id="exp-list" class="list"></div>
+      <div id="proj-list" class="list"></div>
     </section>
 
     <!-- Blog -->
@@ -224,7 +210,7 @@ html = r"""<!DOCTYPE html>
         </div>
         <div class="field">
           <label class="label">Title</label>
-          <input id="blog-title" class="input" placeholder="e.g., Why spike-timing matters" />
+          <input id="blog-title" class="input" placeholder="e.g., Why orbital resonances are cool" />
         </div>
         <div class="field">
           <label class="label">Body</label>
@@ -249,11 +235,11 @@ html = r"""<!DOCTYPE html>
       <div class="card">
         <div class="toolbar" style="justify-content: space-between; margin-bottom: 12px;">
           <div style="font-weight:600;">New Essay</div>
-          <div class="hint">Great for longer, polished writing. Markdown + LaTeX.</div>
+          <div class="hint">For longer, polished writing. Markdown + LaTeX.</div>
         </div>
         <div class="field">
           <label class="label">Title</label>
-          <input id="essay-title" class="input" placeholder="e.g., Neural correlates of predictive coding" />
+          <input id="essay-title" class="input" placeholder="e.g., Symplectic integrators in plain English" />
         </div>
         <div class="field">
           <label class="label">Body</label>
@@ -279,23 +265,23 @@ html = r"""<!DOCTYPE html>
         <h3 style="margin:0 0 8px;">About</h3>
         <div class="field">
           <label class="label">Site Title</label>
-          <input id="about-title" class="input" placeholder="Neuro Notes" />
+          <input id="about-title" class="input" placeholder="dylan standen blog" />
         </div>
         <div class="field">
           <label class="label">Tagline</label>
-          <input id="about-tagline" class="input" placeholder="Experiments • Essays • Blog" />
+          <input id="about-tagline" class="input" placeholder="projects • essays • blog" />
         </div>
         <div class="field">
           <label class="label">Bio (Markdown + LaTeX)</label>
-          <textarea id="about-bio" class="textarea" placeholder="A short bio..."></textarea>
+          <textarea id="about-bio" class="textarea" placeholder="Short bio..."></textarea>
         </div>
         <div class="field">
           <label class="label">Links (comma separated label|url)</label>
-          <input id="about-links" class="input" placeholder="GitHub|https://github.com/username, Lab|https://lab.example.com" />
+          <input id="about-links" class="input" placeholder="GitHub|https://github.com/username, Website|https://example.com" />
         </div>
         <div class="toolbar">
           <button class="btn" id="about-save">Save Profile</button>
-          <span class="hint">Tip: you can export everything as JSON and import later.</span>
+          <span class="hint">Tip: export everything as JSON and import later.</span>
         </div>
       </div>
 
@@ -308,8 +294,8 @@ html = r"""<!DOCTYPE html>
 
   <footer>
     <div class="container inner">
-      <div id="footer-copy">© <span id="year"></span> Neuro Notes</div>
-      <div><a href="#experiments">Experiments</a> · <a href="#blog">Blog</a> · <a href="#essays">Essays</a> · <a href="#about">About</a></div>
+      <div id="footer-copy">© <span id="year"></span> dylan standen blog</div>
+      <div><a href="#projects">Projects</a> · <a href="#blog">Blog</a> · <a href="#essays">Essays</a> · <a href="#about">About</a></div>
     </div>
   </footer>
 
@@ -328,7 +314,6 @@ html = r"""<!DOCTYPE html>
       const safe = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
       const div = document.createElement('div');
       div.innerHTML = safe;
-      // Render math after markdown
       if (window.renderMathInElement) {
         renderMathInElement(div, {
           delimiters: [
@@ -355,46 +340,45 @@ html = r"""<!DOCTYPE html>
     const fileToDataUrl = (file) =>
       new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); });
 
-    // Global State Keys
+    // ---------- Keys & Demo ----------
     const K = {
-      PROFILE: 'bb_profile',
-      EXPS: 'bb_experiments',
-      BLOG: 'bb_blog',
-      ESSAYS: 'bb_essays',
+      PROFILE: 'bb_profile_v2',
+      PROJ: 'bb_projects_v2',
+      BLOG: 'bb_blog_v2',
+      ESSAYS: 'bb_essays_v2',
     };
 
-    // Demo content on first load
     const demoProfile = {
-      title: 'Neuro Notes',
-      tagline: 'Experiments • Essays • Blog',
-      bio: 'Neuroscience researcher exploring oscillations, prediction, and behavior. Write math with $e^{i\\pi}+1=0$ or display mode: $$\\int a^2\\,dx$$',
-      links: [{ label:'GitHub', url:'https://github.com/' }, { label:'Lab', url:'https://example.com' }],
+      title: 'dylan standen blog',
+      tagline: 'projects • essays • blog',
+      bio: 'Writing about physics & math. Try inline math like $e^{i\\pi}+1=0$ or display mode $$\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}$$',
+      links: [{ label:'GitHub', url:'https://github.com/' }],
     };
-    const demoExps = [
+    const demoProjects = [
       {
         id: uid(),
-        title: 'Working memory & alpha power',
-        status: 'Running',
-        tags: ['EEG','alpha','WM'],
-        body: 'Hypothesis: alpha power increases with memory load. Methods: 64-channel EEG, 1–40Hz bandpass. Plot frequency bands with $$P(f) = |\\mathcal{F}\\{x(t)\\}|^2$$',
+        title: 'Coupled orbit demo',
+        tags: ['physics','simulation'],
+        url: 'https://example.com',
+        pdf: '',
+        body: 'A quick note on two-body motion and conserved quantities. Energy: $$E=\\frac{1}{2}\\mu v^2 - \\frac{G M \\mu}{r}$$',
         createdAt: Date.now()-1000*60*60*24*10, updatedAt: Date.now()-1000*60*60*24*3
       }
     ];
     const demoBlog = [
-      { id: uid(), title: 'On spikes and timing', body: 'Why timing matters: $\\Delta w = A_+ e^{-\\Delta t/\\tau_+}$ for pre-before-post.', createdAt: Date.now()-1000*60*60*24*7, updatedAt: Date.now()-1000*60*60*24*2 }
+      { id: uid(), title: 'Resonances & ratios', body: 'Mean motion resonance 3:2 shows up with neat timing diagrams.', createdAt: Date.now()-1000*60*60*24*7, updatedAt: Date.now()-1000*60*60*24*2 }
     ];
     const demoEssays = [
-      { id: uid(), title: 'Predictive coding and perception', body: 'Sketching the core idea with a tiny derivation. $$\\mathcal{L}=\\sum_t \\|x_t - \\hat{x}_t\\|^2 + \\lambda\\,\\|\\theta\\|^2$$', createdAt: Date.now()-1000*60*60*24*20, updatedAt: Date.now()-1000*60*60*24*5 }
+      { id: uid(), title: 'An intuitive tour of Hamiltonian mechanics', body: 'Symplectic areas and why leapfrog works.', createdAt: Date.now()-1000*60*60*24*20, updatedAt: Date.now()-1000*60*60*24*5 }
     ];
 
-    // Initialize defaults
     if (!storage.get(K.PROFILE)) storage.set(K.PROFILE, demoProfile);
-    if (!storage.get(K.EXPS)) storage.set(K.EXPS, demoExps);
+    if (!storage.get(K.PROJ)) storage.set(K.PROJ, demoProjects);
     if (!storage.get(K.BLOG)) storage.set(K.BLOG, demoBlog);
     if (!storage.get(K.ESSAYS)) storage.set(K.ESSAYS, demoEssays);
 
     // ---------- Router ----------
-    const routes = ['experiments','blog','essays','about'];
+    const routes = ['projects','blog','essays','about'];
     const show = (name) => {
       routes.forEach(r => {
         const section = $('#page-' + r);
@@ -407,55 +391,60 @@ html = r"""<!DOCTYPE html>
     };
     const currentRoute = () => {
       const h = (location.hash || '').replace('#','').toLowerCase();
-      return routes.includes(h) ? h : 'experiments';
+      return routes.includes(h) ? h : 'projects';
     };
     window.addEventListener('hashchange', () => show(currentRoute()));
 
     // ---------- Renderers ----------
-    function renderExperiments() {
-      const listEl = $('#exp-list');
-      const q = ($('#exp-search').value || '').toLowerCase();
-      const items = storage.get(K.EXPS, []).slice().sort((a,b) => b.updatedAt - a.updatedAt)
+    function renderProjects() {
+      const listEl = $('#proj-list');
+      const q = ($('#proj-search').value || '').toLowerCase();
+      const items = storage.get(K.PROJ, []).slice().sort((a,b) => b.updatedAt - a.updatedAt)
         .filter(p => !q || (p.title + ' ' + p.body + ' ' + (p.tags||[]).join(' ')).toLowerCase().includes(q));
       listEl.innerHTML = '';
       for (const it of items) {
         const wrap = document.createElement('div');
         wrap.className = 'item';
-        const head = document.createElement('div');
-        head.className = 'item-head';
+        const head = document.createElement('div'); head.className = 'item-head';
         const left = document.createElement('div');
-        const title = document.createElement('div');
-        title.className = 'item-title'; title.textContent = it.title;
-        const meta = document.createElement('div');
-        meta.className = 'item-meta';
-        meta.textContent = `${it.status} • ${fmtDate(it.updatedAt)} • ${ (it.tags||[]).join(', ') }`;
+        const title = document.createElement('div'); title.className = 'item-title'; title.textContent = it.title;
+        const meta = document.createElement('div'); meta.className = 'item-meta';
+        meta.textContent = `${fmtDate(it.updatedAt)} • ${ (it.tags||[]).join(', ') }`;
         left.append(title, meta);
-        const actions = document.createElement('div');
-        actions.className = 'item-actions';
+        const actions = document.createElement('div'); actions.className = 'item-actions';
+        const linkBtns = document.createElement('div');
+        if (it.url) {
+          const a = document.createElement('a');
+          a.href = it.url; a.target = '_blank'; a.rel = 'noreferrer'; a.className = 'btn'; a.textContent = 'Project';
+          linkBtns.append(a);
+        }
+        if (it.pdf) {
+          const a = document.createElement('a');
+          a.href = it.pdf; a.target = '_blank'; a.rel = 'noreferrer'; a.className = 'btn'; a.textContent = 'PDF';
+          linkBtns.append(a);
+        }
         const eBtn = document.createElement('button'); eBtn.className='btn'; eBtn.textContent='Edit';
         const dBtn = document.createElement('button'); dBtn.className='btn'; dBtn.textContent='Delete';
-        actions.append(eBtn, dBtn);
+        actions.append(linkBtns, eBtn, dBtn);
         head.append(left, actions);
-        const body = document.createElement('div');
-        body.className = 'prose';
-        body.append(md(it.body));
+        const body = document.createElement('div'); body.className='prose'; body.append(md(it.body||''));
         wrap.append(head, body);
         listEl.append(wrap);
 
         eBtn.onclick = () => {
-          $('#exp-title').value = it.title;
-          $('#exp-status').value = it.status;
-          $('#exp-tags').value = (it.tags || []).join(', ');
-          $('#exp-body').value = it.body;
-          editing.exp = it.id;
-          show('experiments');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          $('#proj-title').value = it.title;
+          $('#proj-tags').value = (it.tags || []).join(', ');
+          $('#proj-url').value = it.url || '';
+          $('#proj-pdf').value = it.pdf || '';
+          $('#proj-body').value = it.body || '';
+          editing.proj = it.id;
+          show('projects'); window.scrollTo({ top: 0, behavior: 'smooth' });
         };
         dBtn.onclick = () => {
-          if (!confirm('Delete this experiment?')) return;
-          const arr = storage.get(K.EXPS, []).filter(x => x.id !== it.id);
-          storage.set(K.EXPS, arr);
-          renderExperiments();
+          if (!confirm('Delete this project?')) return;
+          const arr = storage.get(K.PROJ, []).filter(x => x.id !== it.id);
+          storage.set(K.PROJ, arr);
+          renderProjects();
         };
       }
     }
@@ -467,10 +456,8 @@ html = r"""<!DOCTYPE html>
         .filter(p => !q || (p.title + ' ' + p.body).toLowerCase().includes(q));
       listEl.innerHTML = '';
       for (const it of items) {
-        const wrap = document.createElement('div');
-        wrap.className = 'item';
-        const head = document.createElement('div');
-        head.className = 'item-head';
+        const wrap = document.createElement('div'); wrap.className = 'item';
+        const head = document.createElement('div'); head.className = 'item-head';
         const left = document.createElement('div');
         const title = document.createElement('div'); title.className = 'item-title'; title.textContent = it.title;
         const meta = document.createElement('div'); meta.className = 'item-meta'; meta.textContent = `Updated ${fmtDate(it.updatedAt)}`;
@@ -480,10 +467,9 @@ html = r"""<!DOCTYPE html>
         const dBtn = document.createElement('button'); dBtn.className='btn'; dBtn.textContent='Delete';
         actions.append(eBtn, dBtn);
         head.append(left, actions);
-        const body = document.createElement('div'); body.className='prose'; body.append(md(it.body));
+        const body = document.createElement('div'); body.className='prose'; body.append(md(it.body||''));
         wrap.append(head, body); listEl.append(wrap);
-
-        eBtn.onclick = () => { $('#blog-title').value = it.title; $('#blog-body').value = it.body; editing.blog = it.id; show('blog'); };
+        eBtn.onclick = () => { $('#blog-title').value = it.title; $('#blog-body').value = it.body||''; editing.blog = it.id; show('blog'); };
         dBtn.onclick = () => { if (!confirm('Delete this post?')) return;
           const arr = storage.get(K.BLOG, []).filter(x => x.id !== it.id); storage.set(K.BLOG, arr); renderBlog(); };
       }
@@ -507,10 +493,9 @@ html = r"""<!DOCTYPE html>
         const dBtn = document.createElement('button'); dBtn.className='btn'; dBtn.textContent='Delete';
         actions.append(eBtn, dBtn);
         head.append(left, actions);
-        const body = document.createElement('div'); body.className='prose'; body.append(md(it.body));
+        const body = document.createElement('div'); body.className='prose'; body.append(md(it.body||''));
         wrap.append(head, body); listEl.append(wrap);
-
-        eBtn.onclick = () => { $('#essay-title').value = it.title; $('#essay-body').value = it.body; editing.essays = it.id; show('essays'); };
+        eBtn.onclick = () => { $('#essay-title').value = it.title; $('#essay-body').value = it.body||''; editing.essays = it.id; show('essays'); };
         dBtn.onclick = () => { if (!confirm('Delete this essay?')) return;
           const arr = storage.get(K.ESSAYS, []).filter(x => x.id !== it.id); storage.set(K.ESSAYS, arr); renderEssays(); };
       }
@@ -523,21 +508,20 @@ html = r"""<!DOCTYPE html>
       $('#about-bio').value = p.bio || '';
       $('#about-links').value = (p.links || []).map(l => `${l.label}|${l.url}`).join(', ');
 
-      $('#siteTitle').textContent = p.title || 'Neuro Notes';
-      $('#siteTagline').textContent = p.tagline || 'Experiments • Essays • Blog';
-      $('#footer-copy').innerHTML = `© <span id="year"></span> ${p.title || 'Neuro Notes'}`;
+      $('#siteTitle').textContent = p.title || 'dylan standen blog';
+      $('#siteTagline').textContent = p.tagline || 'projects • essays • blog';
+      $('#footer-copy').innerHTML = `© <span id="year"></span> ${p.title || 'dylan standen blog'}`;
 
       const prev = $('#about-preview'); prev.innerHTML = '';
-      const frag = md(`# ${p.title || 'Neuro Notes'}\n\n_${p.tagline || ''}_\n\n${p.bio || ''}\n\n${
+      const frag = md(`# ${p.title || 'dylan standen blog'}\n\n_${p.tagline || ''}_\n\n${p.bio || ''}\n\n${
         (p.links||[]).map(l => `- [${l.label}](${l.url})`).join('\\n')
       }`);
       prev.append(frag);
     }
 
     // ---------- Editors ----------
-    const editing = { exp: null, blog: null, essays: null };
+    const editing = { proj: null, blog: null, essays: null };
 
-    // Insert image buttons (data URL)
     document.addEventListener('click', async (e) => {
       const target = e.target.closest('[data-insert-image]');
       if (!target) return;
@@ -553,26 +537,27 @@ html = r"""<!DOCTYPE html>
       input.click();
     });
 
-    // Save / cancel — Experiments
-    $('#exp-save').onclick = () => {
-      const title = $('#exp-title').value.trim();
-      const status = $('#exp-status').value;
-      const tags = $('#exp-tags').value.split(',').map(s => s.trim()).filter(Boolean);
-      const body = $('#exp-body').value;
+    // Save / cancel — Projects
+    $('#proj-save').onclick = () => {
+      const title = $('#proj-title').value.trim();
+      const tags = $('#proj-tags').value.split(',').map(s => s.trim()).filter(Boolean);
+      const url = $('#proj-url').value.trim();
+      const pdf = $('#proj-pdf').value.trim();
+      const body = $('#proj-body').value;
       if (!title) return alert('Title required');
-      const items = storage.get(K.EXPS, []);
-      if (editing.exp) {
-        const idx = items.findIndex(x => x.id === editing.exp);
-        if (idx !== -1) items[idx] = { ...items[idx], title, status, tags, body, updatedAt: Date.now() };
+      const items = storage.get(K.PROJ, []);
+      if (editing.proj) {
+        const idx = items.findIndex(x => x.id === editing.proj);
+        if (idx !== -1) items[idx] = { ...items[idx], title, tags, url, pdf, body, updatedAt: Date.now() };
       } else {
-        items.push({ id: uid(), title, status, tags, body, createdAt: Date.now(), updatedAt: Date.now() });
+        items.push({ id: uid(), title, tags, url, pdf, body, createdAt: Date.now(), updatedAt: Date.now() });
       }
-      storage.set(K.EXPS, items);
-      editing.exp = null;
-      $('#exp-title').value = ''; $('#exp-tags').value = ''; $('#exp-body').value = '';
-      renderExperiments();
+      storage.set(K.PROJ, items);
+      editing.proj = null;
+      $('#proj-title').value = ''; $('#proj-tags').value = ''; $('#proj-url').value=''; $('#proj-pdf').value=''; $('#proj-body').value = '';
+      renderProjects();
     };
-    $('#exp-cancel').onclick = () => { editing.exp = null; $('#exp-title').value=''; $('#exp-tags').value=''; $('#exp-body').value=''; };
+    $('#proj-cancel').onclick = () => { editing.proj = null; $('#proj-title').value=''; $('#proj-tags').value=''; $('#proj-url').value=''; $('#proj-pdf').value=''; $('#proj-body').value=''; };
 
     // Save / cancel — Blog
     $('#blog-save').onclick = () => {
@@ -613,13 +598,13 @@ html = r"""<!DOCTYPE html>
     $('#essay-cancel').onclick = () => { editing.essays = null; $('#essay-title').value=''; $('#essay-body').value=''; };
 
     // Search listeners
-    $('#exp-search').addEventListener('input', renderExperiments);
+    $('#proj-search').addEventListener('input', renderProjects);
     $('#blog-search').addEventListener('input', renderBlog);
     $('#essay-search').addEventListener('input', renderEssays);
 
     // About save
     $('#about-save').onclick = () => {
-      const title = $('#about-title').value.trim() || 'Neuro Notes';
+      const title = $('#about-title').value.trim() || 'dylan standen blog';
       const tagline = $('#about-tagline').value.trim();
       const bio = $('#about-bio').value;
       const links = $('#about-links').value.split(',').map(s => s.trim()).filter(Boolean).map(pair => {
@@ -633,14 +618,14 @@ html = r"""<!DOCTYPE html>
     $('#exportBtn').onclick = () => {
       const data = {
         profile: storage.get(K.PROFILE, {}),
-        experiments: storage.get(K.EXPS, []),
+        projects: storage.get(K.PROJ, []),
         blog: storage.get(K.BLOG, []),
         essays: storage.get(K.ESSAYS, []),
       };
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `neuro-site-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.href = url; a.download = `dylan-standen-blog-backup-${new Date().toISOString().slice(0,10)}.json`;
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     };
     $('#importInput').onchange = async (e) => {
@@ -650,7 +635,7 @@ html = r"""<!DOCTYPE html>
       try {
         const data = JSON.parse(text);
         if (data.profile) storage.set(K.PROFILE, data.profile);
-        if (data.experiments) storage.set(K.EXPS, data.experiments);
+        if (data.projects) storage.set(K.PROJ, data.projects);
         if (data.blog) storage.set(K.BLOG, data.blog);
         if (data.essays) storage.set(K.ESSAYS, data.essays);
         renderAll();
@@ -664,19 +649,21 @@ html = r"""<!DOCTYPE html>
     // Initial render
     function renderAll() {
       renderAbout();
-      renderExperiments();
+      renderProjects();
       renderBlog();
       renderEssays();
       const y = new Date().getFullYear();
       $('#year').textContent = y;
       show(currentRoute());
+      document.title = (storage.get(K.PROFILE, demoProfile).title || 'dylan standen blog') + ' — blackboard';
     }
     renderAll();
   </script>
 </body>
 </html>
 """
-with open('/mnt/data/neuro_blackboard_site.html', 'w', encoding='utf-8') as f:
+with open('/mnt/data/dylan_standen_blog.html', 'w', encoding='utf-8') as f:
     f.write(html)
-html[:3500]
+len(html)
+
 
