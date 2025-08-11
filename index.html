@@ -1,747 +1,682 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import ReactMarkdown from "react-markdown";
-import {
-  BookOpenText,
-  FolderGit2,
-  UserRound,
-  Plus,
-  Moon,
-  Sun,
-  PencilLine,
-  Trash2,
-  Search,
-  Download,
-  Upload,
-  Link as LinkIcon,
-  FileText,
-} from "lucide-react";
+# Create a fully working single-file HTML website with blackboard style, Markdown+KaTeX support,
+# and sections for Experiments, Blog, Essays, and About. Includes export/import and image insertion.
+html = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Neuro Notes — Blackboard</title>
 
-// =============================================
-// Personal Website — Single-file React App
-// Pages: Blog, Projects, About
-// Data persists in localStorage; export/import supported
-// =============================================
+  <!-- KaTeX (for LaTeX math rendering) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex/dist/contrib/auto-render.min.js"></script>
 
-// ---- Utilities ----
-const ls = {
-  get(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (_) {
-      return fallback;
+  <!-- Markdown + Sanitizer -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --bg2: #101010;
+      --fg: #f1f1f1;
+      --muted: #c9c9c9;
+      --line: #2a2a2a;
+      --accent: #ffffff;
+      --card: #0e0e0e;
+      --chip: #141414;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
     }
-  },
-  set(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (_) {}
-  },
-};
-
-const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
-const fmtDate = (d) => new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-const slugify = (s) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .slice(0, 80);
-
-// ---- Initial demo content ----
-const DEMO_PROFILE = {
-  name: "Your Name",
-  tagline: "Essays on mathematics & physics",
-  location: "",
-  email: "",
-  bio: `Welcome! I'm a curious human who writes about math and physics—sometimes proofs, sometimes intuition, always with heart.\n\nThis site is 100% yours: edit anything, add posts and projects, and export your data as JSON.`,
-  links: [
-    { label: "GitHub", url: "https://github.com/" },
-    { label: "Twitter", url: "https://x.com/" },
-  ],
-  avatarUrl: "",
-};
-
-const DEMO_POSTS = [
-  {
-    id: uid(),
-    title: "Why Euler's Formula Feels Inevitable",
-    topic: "mathematics",
-    content:
-      `When you stare at $e^{i\theta}$ long enough, circles sneak into exponentials.\n\nKey intuition: rotating is *adding angles*. The complex plane turns multiplication into rotation, so exponentials that add in the exponent map to rotations that add in angle.\n\n> TL;DR: derivatives of sin/cos keep cycling, so the exponential series wraps them together.\n\n**Sketch**\n\nWe can motivate Euler's formula from the power series:\n\n- $e^x = 1 + x + x^2/2! + x^3/3! + \cdots$\n- $\cos x = 1 - x^2/2! + x^4/4! - \cdots$\n- $\sin x = x - x^3/3! + x^5/5! - \cdots$\n\nPlugging $ix$ into $e^x$ and grouping real/imag parts gives $\cos x + i\sin x$.`,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 14,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 14,
-  },
-  {
-    id: uid(),
-    title: "Noether's Theorem in Plain English",
-    topic: "physics",
-    content:
-      `Every symmetry writes a check that a conservation law cashes.\n\n- Time shift symmetry → energy conserved.\n- Space translation → momentum conserved.\n- Rotation → angular momentum conserved.\n\nThink of the Lagrangian as a promise: if it doesn't change under some transformation, there's a hidden constant riding along in the equations of motion.`,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 9,
-    updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 9,
-  },
-];
-
-const DEMO_PROJECTS = [
-  {
-    id: uid(),
-    title: "LaTeX Essay Template",
-    description: "A tidy LaTeX setup for physics notes with minted, cleveref, and a clean title page.",
-    projectUrl: "https://example.com",
-    pdfUrl: "https://arxiv.org/pdf/2101.00001.pdf",
-    tags: ["latex", "template"],
-  },
-  {
-    id: uid(),
-    title: "Numerical ODE Solver",
-    description: "Tiny TypeScript toy using RK4 to visualize phase portraits.",
-    projectUrl: "https://example.com",
-    pdfUrl: "",
-    tags: ["typescript", "numerics"],
-  },
-];
-
-// ---- Small UI bits ----
-const Chip = ({ active, children, onClick }) => (
-  <button
-    onClick={onClick}
-    className={`px-3 py-1 rounded-full text-sm border transition ${
-      active ? "bg-black text-white dark:bg-white dark:text-black" : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
-    }`}
-  >
-    {children}
-  </button>
-);
-
-const Field = ({ label, children, hint }) => (
-  <label className="block">
-    <span className="text-sm text-neutral-600 dark:text-neutral-300">{label}</span>
-    <div className="mt-1">{children}</div>
-    {hint ? <p className="text-xs text-neutral-500 mt-1">{hint}</p> : null}
-  </label>
-);
-
-const Button = ({ as: Tag = "button", variant = "solid", className = "", children, ...props }) => (
-  <Tag
-    className={
-      `inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium shadow-sm transition active:translate-y-[1px] ` +
-      (variant === "solid"
-        ? "bg-black text-white hover:opacity-90 dark:bg-white dark:text-black"
-        : variant === "ghost"
-        ? "hover:bg-neutral-100 dark:hover:bg-neutral-800"
-        : "border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800") +
-      (className ? ` ${className}` : "")
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      line-height: 1.6;
     }
-    {...props}
-  >
-    {children}
-  </Tag>
-);
+    /* Blackboard texture hint (subtle noise) */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at top left, rgba(255,255,255,0.035), transparent 45%),
+        radial-gradient(ellipse at bottom right, rgba(255,255,255,0.025), transparent 45%);
+      mix-blend-mode: screen;
+      opacity: .7;
+    }
 
-const Card = ({ children, className = "" }) => (
-  <div className={`rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-900/70 shadow-sm ${className}`}>
-    {children}
-  </div>
-);
+    a { color: var(--fg); }
+    a:hover { text-decoration: underline; }
 
-const TextInput = (props) => (
-  <input
-    {...props}
-    className={`w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 outline-none focus:ring-2 focus:ring-black/20 dark:focus:ring-white/20 ${
-      props.className || ""
-    }`}
-  />
-);
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
 
-const TextArea = (props) => (
-  <textarea
-    {...props}
-    className={`w-full min-h-[160px] rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 outline-none focus:ring-2 focus:ring-black/20 dark:focus:ring-white/20 ${
-      props.className || ""
-    }`}
-  />
-);
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: linear-gradient(to bottom, rgba(0,0,0,.95), rgba(0,0,0,.85));
+      border-bottom: 1px dashed var(--line);
+      backdrop-filter: blur(4px);
+    }
+    .nav {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0;
+    }
+    .logo {
+      display: inline-flex; align-items: center; gap: 10px;
+      text-decoration: none;
+    }
+    .logo svg { display: block; }
+    .logo-title { font-weight: 700; letter-spacing: .3px; }
+    .logo-sub { font-size: 12px; color: var(--muted); line-height: 1; margin-top: -4px; }
 
-// ---- Theme ----
-function useTheme() {
-  const [theme, setTheme] = useState(() => ls.get("site_theme", "system"));
-  useEffect(() => {
-    const root = document.documentElement;
-    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const isDark = theme === "dark" || (theme === "system" && prefersDark);
-    root.classList.toggle("dark", isDark);
-    ls.set("site_theme", theme);
-  }, [theme]);
-  return { theme, setTheme };
-}
+    .nav-links { margin-left: auto; display: flex; gap: 6px; }
+    .tab {
+      padding: 8px 12px; border: 1px dashed var(--line); border-radius: 10px;
+      background: var(--chip); color: var(--fg); text-decoration: none; font-size: 14px;
+    }
+    .tab.active, .tab:hover { outline: 2px solid #fff; outline-offset: -2px; }
 
-// ---- Router (hash-based, no deps) ----
-const ROUTES = ["blog", "projects", "about"]; // default: blog
-function useHashRoute() {
-  const [route, setRoute] = useState(() => {
-    const hash = window.location.hash.replace("#", "").toLowerCase();
-    return ROUTES.includes(hash) ? hash : "blog";
-  });
-  useEffect(() => {
-    const onHash = () => {
-      const hash = window.location.hash.replace("#", "").toLowerCase();
-      setRoute(ROUTES.includes(hash) ? hash : "blog");
+    .toolbar {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    }
+    .btn {
+      background: var(--chip);
+      color: var(--fg);
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn:hover { outline: 2px solid #fff; outline-offset: -2px; }
+
+    .input, .select, .textarea {
+      width: 100%;
+      background: var(--bg2);
+      color: var(--fg);
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    .textarea { min-height: 180px; font-family: var(--mono); white-space: pre-wrap; }
+    .field { margin-bottom: 12px; }
+    .label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+
+    .card {
+      background: var(--card);
+      border: 1px dashed var(--line);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    .list { display: grid; gap: 10px; }
+    .item { padding: 14px; border-radius: 12px; border: 1px dashed var(--line); background: #0d0d0d; }
+    .item-head { display: flex; align-items: baseline; gap: 8px; justify-content: space-between; }
+    .item-title { font-weight: 600; font-size: 18px; }
+    .item-meta { color: var(--muted); font-size: 12px; }
+    .item-actions { display: flex; gap: 6px; }
+
+    .prose { font-size: 16px; }
+    .prose h1, .prose h2, .prose h3 { margin: 18px 0 8px; }
+    .prose img { max-width: 100%; border: 1px dashed var(--line); border-radius: 10px; padding: 4px; background: #090909; }
+    .prose code { background: #111; padding: 2px 6px; border-radius: 6px; border: 1px dashed var(--line); }
+    .prose pre { background: #111; padding: 12px; border-radius: 10px; border: 1px dashed var(--line); overflow: auto; }
+    .hint { color: var(--muted); font-size: 13px; }
+
+    footer { border-top: 1px dashed var(--line); margin-top: 40px; color: var(--muted); }
+    footer .inner { padding: 16px 0; display: flex; justify-content: space-between; align-items: center; }
+
+    /* Hide all sections by default; show via [data-page] attribute */
+    main > section { display: none; padding: 18px 0 24px; }
+    main > section.active { display: block; }
+
+    /* Small screens */
+    @media (max-width: 640px) {
+      .nav-links { width: 100%; margin: 8px 0 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <a href="#experiments" class="logo">
+        <!-- Physics-y logo: an "atom" drawn like chalk -->
+        <svg width="42" height="42" viewBox="0 0 64 64" fill="none" stroke="white" stroke-width="2">
+          <circle cx="32" cy="32" r="3" fill="white"></circle>
+          <ellipse cx="32" cy="32" rx="22" ry="10" transform="rotate(20 32 32)" />
+          <ellipse cx="32" cy="32" rx="22" ry="10" transform="rotate(-20 32 32)" />
+          <ellipse cx="32" cy="32" rx="22" ry="10" transform="rotate(90 32 32)" />
+        </svg>
+        <div>
+          <div class="logo-title" id="siteTitle">Neuro Notes</div>
+          <div class="logo-sub" id="siteTagline">Experiments • Essays • Blog</div>
+        </div>
+      </a>
+
+      <nav class="nav-links">
+        <a class="tab" data-route="experiments" href="#experiments">Experiments</a>
+        <a class="tab" data-route="blog" href="#blog">Blog</a>
+        <a class="tab" data-route="essays" href="#essays">Essays</a>
+        <a class="tab" data-route="about" href="#about">About</a>
+        <button id="exportBtn" class="btn">Export</button>
+        <label class="btn" style="cursor:pointer;">
+          Import<input id="importInput" type="file" accept="application/json" style="display:none" />
+        </label>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Experiments -->
+    <section id="page-experiments">
+      <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 12px;">
+          <div style="font-weight:600;">Add / Edit Experiment</div>
+          <div class="hint">Use Markdown + LaTeX ($...$, $$...$$). Click “Insert Image” to embed a local image.</div>
+        </div>
+
+        <div class="field">
+          <label class="label">Title</label>
+          <input id="exp-title" class="input" placeholder="e.g., Alpha band oscillations under working memory load" />
+        </div>
+        <div class="field">
+          <label class="label">Status</label>
+          <select id="exp-status" class="select">
+            <option>Planning</option>
+            <option>Running</option>
+            <option>Completed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="label">Tags (comma separated)</label>
+          <input id="exp-tags" class="input" placeholder="EEG, working memory, alpha" />
+        </div>
+        <div class="field">
+          <label class="label">Body (Markdown + LaTeX)</label>
+          <textarea id="exp-body" class="textarea" placeholder="Methods, stimuli, analysis plan... Use $$\\LaTeX$$ for equations."></textarea>
+          <div class="toolbar" style="margin-top:8px;">
+            <button class="btn" data-insert-image="exp-body">Insert Image</button>
+            <button class="btn" id="exp-save">Save</button>
+            <button class="btn" id="exp-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin: 18px 0 8px;">Your Experiments</h3>
+      <div class="field">
+        <input id="exp-search" class="input" placeholder="Search experiments..." />
+      </div>
+      <div id="exp-list" class="list"></div>
+    </section>
+
+    <!-- Blog -->
+    <section id="page-blog">
+      <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 12px;">
+          <div style="font-weight:600;">New Blog Post</div>
+          <div class="hint">Markdown + LaTeX supported. Use images via the button.</div>
+        </div>
+        <div class="field">
+          <label class="label">Title</label>
+          <input id="blog-title" class="input" placeholder="e.g., Why spike-timing matters" />
+        </div>
+        <div class="field">
+          <label class="label">Body</label>
+          <textarea id="blog-body" class="textarea" placeholder="Write your post..."></textarea>
+          <div class="toolbar" style="margin-top:8px;">
+            <button class="btn" data-insert-image="blog-body">Insert Image</button>
+            <button class="btn" id="blog-save">Save</button>
+            <button class="btn" id="blog-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin: 18px 0 8px;">Posts</h3>
+      <div class="field">
+        <input id="blog-search" class="input" placeholder="Search blog..." />
+      </div>
+      <div id="blog-list" class="list"></div>
+    </section>
+
+    <!-- Essays -->
+    <section id="page-essays">
+      <div class="card">
+        <div class="toolbar" style="justify-content: space-between; margin-bottom: 12px;">
+          <div style="font-weight:600;">New Essay</div>
+          <div class="hint">Great for longer, polished writing. Markdown + LaTeX.</div>
+        </div>
+        <div class="field">
+          <label class="label">Title</label>
+          <input id="essay-title" class="input" placeholder="e.g., Neural correlates of predictive coding" />
+        </div>
+        <div class="field">
+          <label class="label">Body</label>
+          <textarea id="essay-body" class="textarea" placeholder="Write your essay..."></textarea>
+          <div class="toolbar" style="margin-top:8px;">
+            <button class="btn" data-insert-image="essay-body">Insert Image</button>
+            <button class="btn" id="essay-save">Save</button>
+            <button class="btn" id="essay-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin: 18px 0 8px;">Essays</h3>
+      <div class="field">
+        <input id="essay-search" class="input" placeholder="Search essays..." />
+      </div>
+      <div id="essay-list" class="list"></div>
+    </section>
+
+    <!-- About -->
+    <section id="page-about">
+      <div class="card">
+        <h3 style="margin:0 0 8px;">About</h3>
+        <div class="field">
+          <label class="label">Site Title</label>
+          <input id="about-title" class="input" placeholder="Neuro Notes" />
+        </div>
+        <div class="field">
+          <label class="label">Tagline</label>
+          <input id="about-tagline" class="input" placeholder="Experiments • Essays • Blog" />
+        </div>
+        <div class="field">
+          <label class="label">Bio (Markdown + LaTeX)</label>
+          <textarea id="about-bio" class="textarea" placeholder="A short bio..."></textarea>
+        </div>
+        <div class="field">
+          <label class="label">Links (comma separated label|url)</label>
+          <input id="about-links" class="input" placeholder="GitHub|https://github.com/username, Lab|https://lab.example.com" />
+        </div>
+        <div class="toolbar">
+          <button class="btn" id="about-save">Save Profile</button>
+          <span class="hint">Tip: you can export everything as JSON and import later.</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <h3 style="margin:0 0 8px;">Preview</h3>
+        <div id="about-preview" class="prose"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container inner">
+      <div id="footer-copy">© <span id="year"></span> Neuro Notes</div>
+      <div><a href="#experiments">Experiments</a> · <a href="#blog">Blog</a> · <a href="#essays">Essays</a> · <a href="#about">About</a></div>
+    </div>
+  </footer>
+
+  <script>
+    // ---------- Utilities ----------
+    const $ = (sel, root = document) => root.querySelector(sel);
+    const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+    const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const fmtDate = (ts) => new Date(ts).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    const storage = {
+      get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+      set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
     };
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, []);
-  const navigate = (r) => {
-    window.location.hash = r;
-  };
-  return { route, navigate };
-}
+    const md = (text) => {
+      const html = marked.parse(text || '', { breaks: true });
+      const safe = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+      const div = document.createElement('div');
+      div.innerHTML = safe;
+      // Render math after markdown
+      if (window.renderMathInElement) {
+        renderMathInElement(div, {
+          delimiters: [
+            {left: "$$", right: "$$", display: true},
+            {left: "$", right: "$", display: false},
+            {left: "\\\\(", right: "\\\\)", display: false},
+            {left: "\\\\[", right: "\\\\]", display: true}
+          ],
+          throwOnError: false
+        });
+      }
+      return div;
+    };
+    const insertAtCursor = (textarea, text) => {
+      const start = textarea.selectionStart || 0;
+      const end = textarea.selectionEnd || 0;
+      const before = textarea.value.slice(0, start);
+      const after = textarea.value.slice(end);
+      textarea.value = before + text + after;
+      const pos = start + text.length;
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = pos;
+    };
+    const fileToDataUrl = (file) =>
+      new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); });
 
-// ---- Data hooks ----
-function useProfile() {
-  const [profile, setProfile] = useState(() => ls.get("site_profile", DEMO_PROFILE));
-  useEffect(() => ls.set("site_profile", profile), [profile]);
-  return [profile, setProfile];
-}
+    // Global State Keys
+    const K = {
+      PROFILE: 'bb_profile',
+      EXPS: 'bb_experiments',
+      BLOG: 'bb_blog',
+      ESSAYS: 'bb_essays',
+    };
 
-function usePosts() {
-  const [posts, setPosts] = useState(() => ls.get("blog_posts", DEMO_POSTS));
-  useEffect(() => ls.set("blog_posts", posts), [posts]);
-  return [posts, setPosts];
-}
+    // Demo content on first load
+    const demoProfile = {
+      title: 'Neuro Notes',
+      tagline: 'Experiments • Essays • Blog',
+      bio: 'Neuroscience researcher exploring oscillations, prediction, and behavior. Write math with $e^{i\\pi}+1=0$ or display mode: $$\\int a^2\\,dx$$',
+      links: [{ label:'GitHub', url:'https://github.com/' }, { label:'Lab', url:'https://example.com' }],
+    };
+    const demoExps = [
+      {
+        id: uid(),
+        title: 'Working memory & alpha power',
+        status: 'Running',
+        tags: ['EEG','alpha','WM'],
+        body: 'Hypothesis: alpha power increases with memory load. Methods: 64-channel EEG, 1–40Hz bandpass. Plot frequency bands with $$P(f) = |\\mathcal{F}\\{x(t)\\}|^2$$',
+        createdAt: Date.now()-1000*60*60*24*10, updatedAt: Date.now()-1000*60*60*24*3
+      }
+    ];
+    const demoBlog = [
+      { id: uid(), title: 'On spikes and timing', body: 'Why timing matters: $\\Delta w = A_+ e^{-\\Delta t/\\tau_+}$ for pre-before-post.', createdAt: Date.now()-1000*60*60*24*7, updatedAt: Date.now()-1000*60*60*24*2 }
+    ];
+    const demoEssays = [
+      { id: uid(), title: 'Predictive coding and perception', body: 'Sketching the core idea with a tiny derivation. $$\\mathcal{L}=\\sum_t \\|x_t - \\hat{x}_t\\|^2 + \\lambda\\,\\|\\theta\\|^2$$', createdAt: Date.now()-1000*60*60*24*20, updatedAt: Date.now()-1000*60*60*24*5 }
+    ];
 
-function useProjects() {
-  const [projects, setProjects] = useState(() => ls.get("site_projects", DEMO_PROJECTS));
-  useEffect(() => ls.set("site_projects", projects), [projects]);
-  return [projects, setProjects];
-}
+    // Initialize defaults
+    if (!storage.get(K.PROFILE)) storage.set(K.PROFILE, demoProfile);
+    if (!storage.get(K.EXPS)) storage.set(K.EXPS, demoExps);
+    if (!storage.get(K.BLOG)) storage.set(K.BLOG, demoBlog);
+    if (!storage.get(K.ESSAYS)) storage.set(K.ESSAYS, demoEssays);
 
-// ---- Export / Import ----
-function exportData(data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `site-backup-${new Date().toISOString().slice(0, 10)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
+    // ---------- Router ----------
+    const routes = ['experiments','blog','essays','about'];
+    const show = (name) => {
+      routes.forEach(r => {
+        const section = $('#page-' + r);
+        const tab = document.querySelector('.tab[data-route="'+r+'"]');
+        if (!section || !tab) return;
+        section.classList.toggle('active', r === name);
+        tab.classList.toggle('active', r === name);
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    const currentRoute = () => {
+      const h = (location.hash || '').replace('#','').toLowerCase();
+      return routes.includes(h) ? h : 'experiments';
+    };
+    window.addEventListener('hashchange', () => show(currentRoute()));
 
-function importData(file, setters) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
+    // ---------- Renderers ----------
+    function renderExperiments() {
+      const listEl = $('#exp-list');
+      const q = ($('#exp-search').value || '').toLowerCase();
+      const items = storage.get(K.EXPS, []).slice().sort((a,b) => b.updatedAt - a.updatedAt)
+        .filter(p => !q || (p.title + ' ' + p.body + ' ' + (p.tags||[]).join(' ')).toLowerCase().includes(q));
+      listEl.innerHTML = '';
+      for (const it of items) {
+        const wrap = document.createElement('div');
+        wrap.className = 'item';
+        const head = document.createElement('div');
+        head.className = 'item-head';
+        const left = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'item-title'; title.textContent = it.title;
+        const meta = document.createElement('div');
+        meta.className = 'item-meta';
+        meta.textContent = `${it.status} • ${fmtDate(it.updatedAt)} • ${ (it.tags||[]).join(', ') }`;
+        left.append(title, meta);
+        const actions = document.createElement('div');
+        actions.className = 'item-actions';
+        const eBtn = document.createElement('button'); eBtn.className='btn'; eBtn.textContent='Edit';
+        const dBtn = document.createElement('button'); dBtn.className='btn'; dBtn.textContent='Delete';
+        actions.append(eBtn, dBtn);
+        head.append(left, actions);
+        const body = document.createElement('div');
+        body.className = 'prose';
+        body.append(md(it.body));
+        wrap.append(head, body);
+        listEl.append(wrap);
+
+        eBtn.onclick = () => {
+          $('#exp-title').value = it.title;
+          $('#exp-status').value = it.status;
+          $('#exp-tags').value = (it.tags || []).join(', ');
+          $('#exp-body').value = it.body;
+          editing.exp = it.id;
+          show('experiments');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+        dBtn.onclick = () => {
+          if (!confirm('Delete this experiment?')) return;
+          const arr = storage.get(K.EXPS, []).filter(x => x.id !== it.id);
+          storage.set(K.EXPS, arr);
+          renderExperiments();
+        };
+      }
+    }
+
+    function renderBlog() {
+      const listEl = $('#blog-list');
+      const q = ($('#blog-search').value || '').toLowerCase();
+      const items = storage.get(K.BLOG, []).slice().sort((a,b) => b.updatedAt - a.updatedAt)
+        .filter(p => !q || (p.title + ' ' + p.body).toLowerCase().includes(q));
+      listEl.innerHTML = '';
+      for (const it of items) {
+        const wrap = document.createElement('div');
+        wrap.className = 'item';
+        const head = document.createElement('div');
+        head.className = 'item-head';
+        const left = document.createElement('div');
+        const title = document.createElement('div'); title.className = 'item-title'; title.textContent = it.title;
+        const meta = document.createElement('div'); meta.className = 'item-meta'; meta.textContent = `Updated ${fmtDate(it.updatedAt)}`;
+        left.append(title, meta);
+        const actions = document.createElement('div'); actions.className = 'item-actions';
+        const eBtn = document.createElement('button'); eBtn.className='btn'; eBtn.textContent='Edit';
+        const dBtn = document.createElement('button'); dBtn.className='btn'; dBtn.textContent='Delete';
+        actions.append(eBtn, dBtn);
+        head.append(left, actions);
+        const body = document.createElement('div'); body.className='prose'; body.append(md(it.body));
+        wrap.append(head, body); listEl.append(wrap);
+
+        eBtn.onclick = () => { $('#blog-title').value = it.title; $('#blog-body').value = it.body; editing.blog = it.id; show('blog'); };
+        dBtn.onclick = () => { if (!confirm('Delete this post?')) return;
+          const arr = storage.get(K.BLOG, []).filter(x => x.id !== it.id); storage.set(K.BLOG, arr); renderBlog(); };
+      }
+    }
+
+    function renderEssays() {
+      const listEl = $('#essay-list');
+      const q = ($('#essay-search').value || '').toLowerCase();
+      const items = storage.get(K.ESSAYS, []).slice().sort((a,b) => b.updatedAt - a.updatedAt)
+        .filter(p => !q || (p.title + ' ' + p.body).toLowerCase().includes(q));
+      listEl.innerHTML = '';
+      for (const it of items) {
+        const wrap = document.createElement('div'); wrap.className = 'item';
+        const head = document.createElement('div'); head.className = 'item-head';
+        const left = document.createElement('div');
+        const title = document.createElement('div'); title.className = 'item-title'; title.textContent = it.title;
+        const meta = document.createElement('div'); meta.className = 'item-meta'; meta.textContent = `Updated ${fmtDate(it.updatedAt)}`;
+        left.append(title, meta);
+        const actions = document.createElement('div'); actions.className = 'item-actions';
+        const eBtn = document.createElement('button'); eBtn.className='btn'; eBtn.textContent='Edit';
+        const dBtn = document.createElement('button'); dBtn.className='btn'; dBtn.textContent='Delete';
+        actions.append(eBtn, dBtn);
+        head.append(left, actions);
+        const body = document.createElement('div'); body.className='prose'; body.append(md(it.body));
+        wrap.append(head, body); listEl.append(wrap);
+
+        eBtn.onclick = () => { $('#essay-title').value = it.title; $('#essay-body').value = it.body; editing.essays = it.id; show('essays'); };
+        dBtn.onclick = () => { if (!confirm('Delete this essay?')) return;
+          const arr = storage.get(K.ESSAYS, []).filter(x => x.id !== it.id); storage.set(K.ESSAYS, arr); renderEssays(); };
+      }
+    }
+
+    function renderAbout() {
+      const p = storage.get(K.PROFILE, demoProfile);
+      $('#about-title').value = p.title || '';
+      $('#about-tagline').value = p.tagline || '';
+      $('#about-bio').value = p.bio || '';
+      $('#about-links').value = (p.links || []).map(l => `${l.label}|${l.url}`).join(', ');
+
+      $('#siteTitle').textContent = p.title || 'Neuro Notes';
+      $('#siteTagline').textContent = p.tagline || 'Experiments • Essays • Blog';
+      $('#footer-copy').innerHTML = `© <span id="year"></span> ${p.title || 'Neuro Notes'}`;
+
+      const prev = $('#about-preview'); prev.innerHTML = '';
+      const frag = md(`# ${p.title || 'Neuro Notes'}\n\n_${p.tagline || ''}_\n\n${p.bio || ''}\n\n${
+        (p.links||[]).map(l => `- [${l.label}](${l.url})`).join('\\n')
+      }`);
+      prev.append(frag);
+    }
+
+    // ---------- Editors ----------
+    const editing = { exp: null, blog: null, essays: null };
+
+    // Insert image buttons (data URL)
+    document.addEventListener('click', async (e) => {
+      const target = e.target.closest('[data-insert-image]');
+      if (!target) return;
+      const where = target.getAttribute('data-insert-image');
+      const ta = document.getElementById(where);
+      const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*' });
+      input.onchange = async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const url = await fileToDataUrl(file);
+        insertAtCursor(ta, `\\n\\n![image](${url})\\n\\n`);
+      };
+      input.click();
+    });
+
+    // Save / cancel — Experiments
+    $('#exp-save').onclick = () => {
+      const title = $('#exp-title').value.trim();
+      const status = $('#exp-status').value;
+      const tags = $('#exp-tags').value.split(',').map(s => s.trim()).filter(Boolean);
+      const body = $('#exp-body').value;
+      if (!title) return alert('Title required');
+      const items = storage.get(K.EXPS, []);
+      if (editing.exp) {
+        const idx = items.findIndex(x => x.id === editing.exp);
+        if (idx !== -1) items[idx] = { ...items[idx], title, status, tags, body, updatedAt: Date.now() };
+      } else {
+        items.push({ id: uid(), title, status, tags, body, createdAt: Date.now(), updatedAt: Date.now() });
+      }
+      storage.set(K.EXPS, items);
+      editing.exp = null;
+      $('#exp-title').value = ''; $('#exp-tags').value = ''; $('#exp-body').value = '';
+      renderExperiments();
+    };
+    $('#exp-cancel').onclick = () => { editing.exp = null; $('#exp-title').value=''; $('#exp-tags').value=''; $('#exp-body').value=''; };
+
+    // Save / cancel — Blog
+    $('#blog-save').onclick = () => {
+      const title = $('#blog-title').value.trim();
+      const body = $('#blog-body').value;
+      if (!title) return alert('Title required');
+      const items = storage.get(K.BLOG, []);
+      if (editing.blog) {
+        const idx = items.findIndex(x => x.id === editing.blog);
+        if (idx !== -1) items[idx] = { ...items[idx], title, body, updatedAt: Date.now() };
+      } else {
+        items.push({ id: uid(), title, body, createdAt: Date.now(), updatedAt: Date.now() });
+      }
+      storage.set(K.BLOG, items);
+      editing.blog = null;
+      $('#blog-title').value=''; $('#blog-body').value='';
+      renderBlog();
+    };
+    $('#blog-cancel').onclick = () => { editing.blog = null; $('#blog-title').value=''; $('#blog-body').value=''; };
+
+    // Save / cancel — Essays
+    $('#essay-save').onclick = () => {
+      const title = $('#essay-title').value.trim();
+      const body = $('#essay-body').value;
+      if (!title) return alert('Title required');
+      const items = storage.get(K.ESSAYS, []);
+      if (editing.essays) {
+        const idx = items.findIndex(x => x.id === editing.essays);
+        if (idx !== -1) items[idx] = { ...items[idx], title, body, updatedAt: Date.now() };
+      } else {
+        items.push({ id: uid(), title, body, createdAt: Date.now(), updatedAt: Date.now() });
+      }
+      storage.set(K.ESSAYS, items);
+      editing.essays = null;
+      $('#essay-title').value=''; $('#essay-body').value='';
+      renderEssays();
+    };
+    $('#essay-cancel').onclick = () => { editing.essays = null; $('#essay-title').value=''; $('#essay-body').value=''; };
+
+    // Search listeners
+    $('#exp-search').addEventListener('input', renderExperiments);
+    $('#blog-search').addEventListener('input', renderBlog);
+    $('#essay-search').addEventListener('input', renderEssays);
+
+    // About save
+    $('#about-save').onclick = () => {
+      const title = $('#about-title').value.trim() || 'Neuro Notes';
+      const tagline = $('#about-tagline').value.trim();
+      const bio = $('#about-bio').value;
+      const links = $('#about-links').value.split(',').map(s => s.trim()).filter(Boolean).map(pair => {
+        const [label, url] = pair.split('|'); return { label: (label||'Link').trim(), url: (url||'').trim() };
+      });
+      storage.set(K.PROFILE, { title, tagline, bio, links });
+      renderAbout();
+    };
+
+    // Export / Import
+    $('#exportBtn').onclick = () => {
+      const data = {
+        profile: storage.get(K.PROFILE, {}),
+        experiments: storage.get(K.EXPS, []),
+        blog: storage.get(K.BLOG, []),
+        essays: storage.get(K.ESSAYS, []),
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `neuro-site-backup-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    };
+    $('#importInput').onchange = async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
       try {
-        const parsed = JSON.parse(reader.result);
-        if (parsed.profile) setters.setProfile(parsed.profile);
-        if (parsed.posts) setters.setPosts(parsed.posts);
-        if (parsed.projects) setters.setProjects(parsed.projects);
-        resolve(true);
-      } catch (e) {
-        reject(e);
+        const data = JSON.parse(text);
+        if (data.profile) storage.set(K.PROFILE, data.profile);
+        if (data.experiments) storage.set(K.EXPS, data.experiments);
+        if (data.blog) storage.set(K.BLOG, data.blog);
+        if (data.essays) storage.set(K.ESSAYS, data.essays);
+        renderAll();
+      } catch (err) {
+        alert('Invalid JSON backup.');
+      } finally {
+        e.target.value = '';
       }
     };
-    reader.onerror = reject;
-    reader.readAsText(file);
-  });
-}
 
-// ---- Navbar ----
-function Navbar({ current, onNavigate, onExport, onImport, theme, setTheme, profile }) {
-  const [importing, setImporting] = useState(false);
-  return (
-    <div className="sticky top-0 z-30 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-neutral-900/60 bg-white/80 dark:bg-neutral-900/80 border-b border-neutral-200 dark:border-neutral-800">
-      <div className="mx-auto max-w-6xl px-4 py-3 flex items-center gap-3">
-        <a href="#blog" className="flex items-center gap-3 group">
-          <div className="size-9 rounded-xl bg-black text-white dark:bg-white dark:text-black grid place-items-center shadow-sm">
-            <BookOpenText size={18} />
-          </div>
-          <div>
-            <div className="font-semibold leading-tight">{profile?.name || "Your Name"}</div>
-            <div className="text-xs text-neutral-500 -mt-0.5">{profile?.tagline || "Math & Physics"}</div>
-          </div>
-        </a>
-        <div className="flex-1" />
-        <nav className="flex items-center gap-1">
-          {[
-            { key: "blog", label: "Blog", icon: BookOpenText },
-            { key: "projects", label: "Projects", icon: FolderGit2 },
-            { key: "about", label: "About", icon: UserRound },
-          ].map((tab) => (
-            <Button
-              key={tab.key}
-              variant={current === tab.key ? "solid" : "ghost"}
-              onClick={() => onNavigate(tab.key)}
-              className="rounded-xl"
-            >
-              <tab.icon size={16} /> {tab.label}
-            </Button>
-          ))}
-        </nav>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={() => setTheme(theme === "dark" ? "light" : theme === "light" ? "system" : "dark")}>
-            {theme === "dark" ? <Moon size={16} /> : theme === "light" ? <Sun size={16} /> : <Sun size={16} />}
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-          <Button variant="outline" onClick={onExport}>
-            <Download size={16} /> Export
-          </Button>
-          <label className="inline-flex items-center">
-            <input
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={async (e) => {
-                if (!e.target.files?.[0]) return;
-                setImporting(true);
-                try {
-                  await onImport(e.target.files[0]);
-                } finally {
-                  setImporting(false);
-                  e.target.value = "";
-                }
-              }}
-            />
-            <Button as="span" variant="outline" className={importing ? "opacity-60 pointer-events-none" : ""}>
-              <Upload size={16} /> Import
-            </Button>
-          </label>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---- Blog ----
-function BlogPage({ posts, setPosts }) {
-  const [q, setQ] = useState("");
-  const [topic, setTopic] = useState("all");
-  const [editingId, setEditingId] = useState(null);
-  const [draft, setDraft] = useState({ title: "", topic: "mathematics", content: "" });
-
-  const filtered = useMemo(() => {
-    return posts
-      .filter((p) => (topic === "all" ? true : p.topic === topic))
-      .filter((p) =>
-        q
-          ? [p.title, p.content].join("\n").toLowerCase().includes(q.toLowerCase())
-          : true
-      )
-      .sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [posts, q, topic]);
-
-  const startNew = () => {
-    setEditingId("new");
-    setDraft({ title: "", topic: "mathematics", content: "" });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const startEdit = (post) => {
-    setEditingId(post.id);
-    setDraft({ title: post.title, topic: post.topic, content: post.content });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const saveDraft = () => {
-    if (!draft.title.trim()) return alert("Title required");
-    if (editingId === "new") {
-      const now = Date.now();
-      setPosts([
-        ...posts,
-        {
-          id: uid(),
-          title: draft.title.trim(),
-          topic: draft.topic,
-          content: draft.content,
-          createdAt: now,
-          updatedAt: now,
-          slug: slugify(draft.title),
-        },
-      ]);
-    } else {
-      setPosts(
-        posts.map((p) =>
-          p.id === editingId
-            ? { ...p, title: draft.title.trim(), topic: draft.topic, content: draft.content, updatedAt: Date.now() }
-            : p
-        )
-      );
+    // Initial render
+    function renderAll() {
+      renderAbout();
+      renderExperiments();
+      renderBlog();
+      renderEssays();
+      const y = new Date().getFullYear();
+      $('#year').textContent = y;
+      show(currentRoute());
     }
-    setEditingId(null);
-  };
+    renderAll();
+  </script>
+</body>
+</html>
+"""
+with open('/mnt/data/neuro_blackboard_site.html', 'w', encoding='utf-8') as f:
+    f.write(html)
+html[:3500]
 
-  const remove = (id) => {
-    if (confirm("Delete this post?")) setPosts(posts.filter((p) => p.id !== id));
-  };
-
-  return (
-    <div className="mx-auto max-w-4xl p-4">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
-          <TextInput placeholder="Search posts" value={q} onChange={(e) => setQ(e.target.value)} className="pl-9" />
-        </div>
-        <Button onClick={startNew}>
-          <Plus size={16} /> New Post
-        </Button>
-      </div>
-
-      {editingId && (
-        <Card className="p-4 mb-6">
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="Title">
-              <TextInput value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-            </Field>
-            <Field label="Topic">
-              <select
-                value={draft.topic}
-                onChange={(e) => setDraft({ ...draft, topic: e.target.value })}
-                className="w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2"
-              >
-                <option value="mathematics">Mathematics</option>
-                <option value="physics">Physics</option>
-                <option value="other">Other</option>
-              </select>
-            </Field>
-            <div className="md:col-span-2">
-              <Field label="Content (Markdown supported)">
-                <TextArea value={draft.content} onChange={(e) => setDraft({ ...draft, content: e.target.value })} />
-              </Field>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 mt-4">
-            <Button onClick={saveDraft}>Save</Button>
-            <Button variant="outline" onClick={() => setEditingId(null)}>
-              Cancel
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      <div className="flex items-center gap-2 mb-3">
-        <Chip active={topic === "all"} onClick={() => setTopic("all")}>
-          All
-        </Chip>
-        <Chip active={topic === "mathematics"} onClick={() => setTopic("mathematics")}>
-          Mathematics
-        </Chip>
-        <Chip active={topic === "physics"} onClick={() => setTopic("physics")}>
-          Physics
-        </Chip>
-        <Chip active={topic === "other"} onClick={() => setTopic("other")}>
-          Other
-        </Chip>
-      </div>
-
-      <div className="grid gap-4">
-        <AnimatePresence>
-          {filtered.map((p) => (
-            <motion.div key={p.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-              <Card className="p-5">
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold leading-snug">{p.title}</h3>
-                    <div className="text-xs text-neutral-500 mt-0.5">
-                      {p.topic.charAt(0).toUpperCase() + p.topic.slice(1)} • Updated {fmtDate(p.updatedAt)}
-                    </div>
-                    <div className="prose prose-neutral dark:prose-invert max-w-none mt-3">
-                      <ReactMarkdown>{p.content}</ReactMarkdown>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 ml-2">
-                    <Button variant="ghost" onClick={() => startEdit(p)}>
-                      <PencilLine size={16} /> Edit
-                    </Button>
-                    <Button variant="ghost" onClick={() => remove(p.id)}>
-                      <Trash2 size={16} /> Delete
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {filtered.length === 0 && (
-        <p className="text-neutral-500 text-sm mt-6">No posts yet. Click “New Post” to start writing.</p>
-      )}
-    </div>
-  );
-}
-
-// ---- Projects ----
-function ProjectsPage({ projects, setProjects }) {
-  const [showForm, setShowForm] = useState(false);
-  const [draft, setDraft] = useState({ title: "", description: "", projectUrl: "", pdfUrl: "", tags: "" });
-
-  const add = () => {
-    if (!draft.title.trim()) return alert("Title required");
-    const proj = {
-      id: uid(),
-      title: draft.title.trim(),
-      description: draft.description.trim(),
-      projectUrl: draft.projectUrl.trim(),
-      pdfUrl: draft.pdfUrl.trim(),
-      tags: draft.tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-    };
-    setProjects([proj, ...projects]);
-    setDraft({ title: "", description: "", projectUrl: "", pdfUrl: "", tags: "" });
-    setShowForm(false);
-  };
-
-  const remove = (id) => {
-    if (confirm("Delete this project?")) setProjects(projects.filter((p) => p.id !== id));
-  };
-
-  return (
-    <div className="mx-auto max-w-5xl p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Projects</h2>
-        <Button onClick={() => setShowForm((s) => !s)}>{showForm ? "Close" : (<><Plus size={16}/> New Project</>)}</Button>
-      </div>
-
-      {showForm && (
-        <Card className="p-4 mb-6">
-          <div className="grid md:grid-cols-2 gap-4">
-            <Field label="Title"><TextInput value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Field>
-            <Field label="Tags (comma-separated)"><TextInput value={draft.tags} onChange={(e) => setDraft({ ...draft, tags: e.target.value })} placeholder="math, physics, web"/></Field>
-            <div className="md:col-span-2"><Field label="Description"><TextArea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field></div>
-            <Field label="Project URL" hint="Repository or live demo link">
-              <TextInput value={draft.projectUrl} onChange={(e) => setDraft({ ...draft, projectUrl: e.target.value })} placeholder="https://..." />
-            </Field>
-            <Field label="PDF URL (optional)" hint="Link to a paper, report, or PDF in your /public folder or anywhere online">
-              <TextInput value={draft.pdfUrl} onChange={(e) => setDraft({ ...draft, pdfUrl: e.target.value })} placeholder="https://.../paper.pdf" />
-            </Field>
-          </div>
-          <div className="flex items-center gap-2 mt-4">
-            <Button onClick={add}><Plus size={16}/> Add Project</Button>
-            <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-          </div>
-        </Card>
-      )}
-
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {projects.map((p) => (
-          <motion.div key={p.id} whileHover={{ y: -2 }}>
-            <Card className="p-4 h-full flex flex-col">
-              <div className="flex-1">
-                <h3 className="font-semibold text-base leading-tight">{p.title}</h3>
-                {p.tags?.length ? (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {p.tags.map((t, i) => (
-                      <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">{t}</span>
-                    ))}
-                  </div>
-                ) : null}
-                <p className="text-sm text-neutral-600 dark:text-neutral-300 mt-2 line-clamp-4">{p.description}</p>
-              </div>
-              <div className="flex items-center gap-2 pt-3">
-                {p.projectUrl && (
-                  <Button as="a" href={p.projectUrl} target="_blank" rel="noreferrer" className="flex-1 justify-center">
-                    <LinkIcon size={16}/> Project
-                  </Button>
-                )}
-                {p.pdfUrl && (
-                  <Button as="a" href={p.pdfUrl} target="_blank" rel="noreferrer" variant="outline" className="flex-1 justify-center">
-                    <FileText size={16}/> PDF
-                  </Button>
-                )}
-                <Button variant="ghost" onClick={() => remove(p.id)} title="Delete" className="ml-auto"><Trash2 size={16}/></Button>
-              </div>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {projects.length === 0 && <p className="text-neutral-500 text-sm mt-6">No projects yet. Add your first one above.</p>}
-    </div>
-  );
-}
-
-// ---- About ----
-function AboutPage({ profile, setProfile }) {
-  const [draft, setDraft] = useState(profile);
-  useEffect(() => setDraft(profile), [profile]);
-
-  const save = () => setProfile(draft);
-
-  return (
-    <div className="mx-auto max-w-3xl p-4">
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card className="p-4 md:col-span-1">
-          <div className="flex flex-col items-center text-center">
-            <div className="size-28 rounded-2xl bg-neutral-100 dark:bg-neutral-800 overflow-hidden grid place-items-center">
-              {draft.avatarUrl ? (
-                <img src={draft.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
-              ) : (
-                <UserRound className="text-neutral-400" />
-              )}
-            </div>
-            <Field label="Avatar URL">
-              <TextInput value={draft.avatarUrl} onChange={(e) => setDraft({ ...draft, avatarUrl: e.target.value })} placeholder="https://.../me.jpg" />
-            </Field>
-          </div>
-        </Card>
-        <Card className="p-4 md:col-span-2">
-          <div className="grid gap-4">
-            <Field label="Name"><TextInput value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
-            <Field label="Tagline"><TextInput value={draft.tagline} onChange={(e) => setDraft({ ...draft, tagline: e.target.value })} placeholder="Essays on mathematics & physics"/></Field>
-            <div className="grid md:grid-cols-2 gap-4">
-              <Field label="Location"><TextInput value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} /></Field>
-              <Field label="Email"><TextInput type="email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></Field>
-            </div>
-            <Field label="Bio"><TextArea value={draft.bio} onChange={(e) => setDraft({ ...draft, bio: e.target.value })} /></Field>
-            <LinksEditor links={draft.links} onChange={(links) => setDraft({ ...draft, links })} />
-            <div className="flex items-center gap-2">
-              <Button onClick={save}><PencilLine size={16}/> Save</Button>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <Card className="p-4 mt-6">
-        <h3 className="font-semibold mb-2">Preview</h3>
-        <div className="prose prose-neutral dark:prose-invert max-w-none">
-          <h1 className="mb-0">{profile.name || "Your Name"}</h1>
-          <p className="mt-1">{profile.tagline}</p>
-          <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">{[profile.location, profile.email].filter(Boolean).join(" • ")}</p>
-          <p className="whitespace-pre-wrap">{profile.bio}</p>
-          {profile.links?.length ? (
-            <p className="flex flex-wrap gap-2">
-              {profile.links.map((l, i) => (
-                <a key={i} className="underline decoration-dotted" href={l.url} target="_blank" rel="noreferrer">{l.label}</a>
-              ))}
-            </p>
-          ) : null}
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function LinksEditor({ links, onChange }) {
-  const [items, setItems] = useState(links || []);
-  useEffect(() => setItems(links || []), [links]);
-  useEffect(() => onChange(items), [items]);
-
-  const add = () => setItems([...(items || []), { label: "", url: "" }]);
-  const update = (i, patch) => setItems(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
-  const remove = (i) => setItems(items.filter((_, idx) => idx !== i));
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm text-neutral-600 dark:text-neutral-300">Links</span>
-        <Button variant="ghost" onClick={add}><Plus size={16}/> Add link</Button>
-      </div>
-      <div className="grid gap-2">
-        {items.map((it, i) => (
-          <div key={i} className="grid grid-cols-11 gap-2">
-            <TextInput className="col-span-3" placeholder="Label" value={it.label} onChange={(e) => update(i, { label: e.target.value })} />
-            <TextInput className="col-span-7" placeholder="https://..." value={it.url} onChange={(e) => update(i, { url: e.target.value })} />
-            <Button variant="ghost" onClick={() => remove(i)} className="col-span-1"><Trash2 size={16}/></Button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---- Shell ----
-export default function PersonalSite() {
-  const { route, navigate } = useHashRoute();
-  const [profile, setProfile] = useProfile();
-  const [posts, setPosts] = usePosts();
-  const [projects, setProjects] = useProjects();
-  const { theme, setTheme } = useTheme();
-
-  const onExport = () => exportData({ profile, posts, projects });
-  const onImport = async (file) => importData(file, { setProfile, setPosts, setProjects });
-
-  useEffect(() => {
-    document.title = `${profile.name || "Your"} – ${route.charAt(0).toUpperCase() + route.slice(1)}`;
-  }, [route, profile?.name]);
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-950 dark:to-neutral-900 text-neutral-900 dark:text-neutral-50">
-      <Navbar
-        current={route}
-        onNavigate={navigate}
-        onExport={onExport}
-        onImport={onImport}
-        theme={theme}
-        setTheme={setTheme}
-        profile={profile}
-      />
-
-      <main className="mx-auto max-w-6xl">
-        <AnimatePresence mode="wait">
-          {route === "blog" && (
-            <motion.section key="blog" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-              <Hero profile={profile} />
-              <BlogPage posts={posts} setPosts={setPosts} />
-            </motion.section>
-          )}
-          {route === "projects" && (
-            <motion.section key="projects" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-              <SectionHeader title="Things I've built" subtitle="Code, papers, and experiments." />
-              <ProjectsPage projects={projects} setProjects={setProjects} />
-            </motion.section>
-          )}
-          {route === "about" && (
-            <motion.section key="about" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-              <SectionHeader title="About me" subtitle="Edit and save your profile below." />
-              <AboutPage profile={profile} setProfile={setProfile} />
-            </motion.section>
-          )}
-        </AnimatePresence>
-      </main>
-
-      <footer className="border-t border-neutral-200 dark:border-neutral-800 mt-8">
-        <div className="mx-auto max-w-6xl p-4 text-sm text-neutral-500 flex items-center justify-between">
-          <div>© {new Date().getFullYear()} {profile.name || "Your Name"}</div>
-          <div className="flex items-center gap-3">
-            <a href="#blog" className="hover:underline">Blog</a>
-            <a href="#projects" className="hover:underline">Projects</a>
-            <a href="#about" className="hover:underline">About</a>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function Hero({ profile }) {
-  return (
-    <div className="mx-auto max-w-4xl px-4 pt-10">
-      <div className="grid md:grid-cols-[1fr,auto] items-center gap-6">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">{profile?.tagline || "Essays on mathematics & physics"}</h1>
-          <p className="text-neutral-600 dark:text-neutral-300 mt-2 max-w-2xl">{profile?.bio?.split("\n")[0] || "A clean, fast space for your long-form writing."}</p>
-        </div>
-        <div className="hidden md:block">
-          <div className="size-20 rounded-2xl bg-black text-white dark:bg-white dark:text-black grid place-items-center shadow">
-            <BookOpenText />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SectionHeader({ title, subtitle }) {
-  return (
-    <div className="mx-auto max-w-4xl px-4 pt-8 pb-2">
-      <h2 className="text-2xl font-semibold">{title}</h2>
-      {subtitle && <p className="text-neutral-600 dark:text-neutral-300 mt-1">{subtitle}</p>}
-    </div>
-  );
-}
